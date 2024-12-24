@@ -46,8 +46,8 @@ export class CodeSuiteManager {
     }
 
     private async loadSuite(suite: ICodeSuite) {
-        const baseUrl = process.env.NEXT_PUBLIC_VERCEL_URL 
-            ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
+        const baseUrl = typeof window !== 'undefined' 
+            ? window.location.origin 
             : '';
         const url = `${baseUrl}/riscv/examples/${suite.fileName}`;
 
@@ -84,8 +84,8 @@ export class CodeSuiteManager {
             suite.loaded = true;
             this.suites.set(suite.fileName, { ...suite });
             this.subs.notify();
-        } catch (error) {
-            suite.loadError = `Load failed: ${error.message}`;
+        } catch (error: unknown) {
+            suite.loadError = `Load failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
             this.subs.notify();
         }
     }
