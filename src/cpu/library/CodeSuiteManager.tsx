@@ -46,35 +46,48 @@ export class CodeSuiteManager {
     }
 
     private async loadSuite(suite: ICodeSuite) {
-        let basePath = (process.env.BASE_URL ?? '') + '/riscv/examples/';
-        let resp = await fetch(basePath + suite.fileName);
+        const baseUrl = process.env.NEXT_PUBLIC_VERCEL_URL 
+            ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
+            : '';
+        const url = `${baseUrl}/riscv/examples/${suite.fileName}`;
 
-        if (!resp.ok) {
-            let respBody = await resp.text();
-            suite.loadError = `Load failed: ${resp.status} ${resp.statusText} body:'${respBody.slice(0, 200)}'`;
+        try {
+            let resp = await fetch(url, {
+                headers: {
+                    'Accept': 'application/octet-stream'
+                }
+            });
+
+            if (!resp.ok) {
+                let respBody = await resp.text();
+                suite.loadError = `Load failed: ${resp.status} ${resp.statusText} body:'${respBody.slice(0, 200)}'`;
+                this.subs.notify();
+                return;
+            }
+
+            let elfFile = new Uint8Array(await resp.arrayBuffer());
+
+            let header = readElfHeader(elfFile)!;
+            let sections = listElfTextSections(elfFile, header);
+
+            let examples = sections.map(section => {
+                // name is '.text_add0', and we want 'add0'
+                let name = section.name.slice(6) || section.name;
+                return {
+                    name,
+                    elfSection: section,
+                    expectFail: name.startsWith('must_fail'),
+                };
+            });
+
+            suite.entries = examples;
+            suite.loaded = true;
+            this.suites.set(suite.fileName, { ...suite });
             this.subs.notify();
-            return;
+        } catch (error) {
+            suite.loadError = `Load failed: ${error.message}`;
+            this.subs.notify();
         }
-
-        let elfFile = new Uint8Array(await resp.arrayBuffer());
-
-        let header = readElfHeader(elfFile)!;
-        let sections = listElfTextSections(elfFile, header);
-
-        let examples = sections.map(section => {
-            // name is '.text_add0', and we want 'add0'
-            let name = section.name.slice(6) || section.name;
-            return {
-                name,
-                elfSection: section,
-                expectFail: name.startsWith('must_fail'),
-            };
-        });
-
-        suite.entries = examples;
-        suite.loaded = true;
-        this.suites.set(suite.fileName, { ...suite });
-        this.subs.notify();
     }
 }
 

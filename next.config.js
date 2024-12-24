@@ -20,6 +20,19 @@ const nextConfig = {
     });
     return config;
   },
+  async headers() {
+    return [
+      {
+        source: '/riscv/examples/:path*',
+        headers: [
+          {
+            key: 'Content-Type',
+            value: 'application/octet-stream',
+          },
+        ],
+      },
+    ];
+  },
   redirects: async () => {
     return [
       {
